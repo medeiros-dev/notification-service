@@ -1,0 +1,178 @@
+networks:
+  notification-net:
+    driver: bridge
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+  jaeger-data:
+    driver: local
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    networks:
+      - notification-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: grafana
+    restart: unless-stopped
+    networks:
+      - notification-net
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_LOG_LEVEL=debug
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.2
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - notification-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.2
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_CREATE_TOPICS: "notifications:1:1, dlq-notifications:1:1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    networks:
+      - notification-net
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "16686:16686"
+      - "14268:14268"
+      - "14250:14250"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - notification-net
+
+  notification-consumer:
+    build:
+      context: ./consumer
+      dockerfile: DockerFile
+    container_name: notification-consumer
+    restart: unless-stopped
+    networks:
+      - notification-net
+    depends_on:
+      - kafka
+      - jaeger
+    environment:
+      - MAX_RETRIES=3
+      - WORKER_POOL_SIZE=10
+      - BACKOFF_BASE_DELAY_MS=1000
+      - ENABLED_CHANNELS=email
+      # Observability
+      - METRICS_SERVER_ADDRESS=:8081
+      - OTEL_SERVICE_NAME=notification-service-consumers
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+      # Kafka
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_GROUP_ID=consumers-group
+      - KAFKA_TOPIC=notifications
+      - KAFKA_DLQ_TOPIC=dlq-notifications
+      # Email
+      - EMAIL_DRIVER=smtp
+      - EMAIL_MAILER=smtp
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_PORT=587
+      - EMAIL_USERNAME= # Set via Docker secret
+      - EMAIL_PASSWORD= # Set via Docker secret
+      - EMAIL_ENCRYPTION=STARTTLS
+      - EMAIL_FROM_ADDRESS= # Set via Docker secret
+      - EMAIL_FROM_NAME= # Set via Docker secret
+
+  notification-producer-go:
+    build:
+      context: ./go-producer
+      dockerfile: DockerFile
+    container_name: notification-producer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - notification-net
+    environment:
+      # Kafka
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_TOPIC=notifications
+      - ENABLED_CHANNELS=email,sms
+      # Observability
+      - OTEL_SERVICE_NAME=go-producer
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+    depends_on:
+      - kafka
+      - jaeger
+
+  notification-producer-py:
+    build:
+      context: ./py-producer
+      dockerfile: Dockerfile
+    container_name: notification-producer-py
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    networks:
+      - notification-net
+    environment:
+      # Kafka
+      - KAFKA_BROKERS=["kafka:9092"]
+      - KAFKA_TOPIC=notifications
+      - ENABLED_CHANNELS=["sms", "email", "push"]
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=notification-producer-py
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+    depends_on:
+      - kafka
+      - jaeger
