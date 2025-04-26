@@ -1,0 +1,25 @@
+# Etapa 1: Build
+FROM golang:1.23 AS builder
+
+WORKDIR /app
+
+COPY . .
+
+RUN go mod download
+
+RUN go mod verify
+
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o go-producer-go cmd/server/main.go
+
+# Etapa 2: Execução
+FROM alpine
+
+WORKDIR /app
+
+COPY --from=builder /app/go.mod .
+COPY --from=builder /app/go-producer-go .
+
+EXPOSE 8080
+
+# Comando para rodar a aplicação
+CMD ["./go-producer-go"]
