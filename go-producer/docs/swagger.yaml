@@ -1,0 +1,107 @@
+basePath: /
+definitions:
+  domain.UserProfile:
+    properties:
+      name:
+        type: string
+      preferred_language:
+        type: string
+      timezone:
+        type: string
+      user_id:
+        type: string
+    type: object
+  sendnotification.Channel:
+    properties:
+      destination:
+        type: string
+      enabled:
+        type: boolean
+      type:
+        type: string
+    type: object
+  sendnotification.MessageResponse:
+    properties:
+      channel_type:
+        type: string
+      error:
+        type: string
+      id:
+        type: string
+      status:
+        type: string
+    type: object
+  sendnotification.SendNotificationInputDTO:
+    properties:
+      channels:
+        items:
+          $ref: '#/definitions/sendnotification.Channel'
+        type: array
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      user_profile:
+        $ref: '#/definitions/domain.UserProfile'
+    type: object
+  sendnotification.SendNotificationOutputDTO:
+    properties:
+      messages:
+        items:
+          $ref: '#/definitions/sendnotification.MessageResponse'
+        type: array
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is the API for the Notification Producer service.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Notification Producer API
+  version: "1.0"
+paths:
+  /send-notification:
+    post:
+      consumes:
+      - application/json
+      description: Receives notification details and queues them for delivery via
+        specified channels.
+      parameters:
+      - description: Notification Request Body
+        in: body
+        name: notification
+        required: true
+        schema:
+          $ref: '#/definitions/sendnotification.SendNotificationInputDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/sendnotification.SendNotificationOutputDTO'
+        "400":
+          description: '{"error": "Invalid request payload: <details>"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: '{"error": "Failed to process notification"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Send Notification
+      tags:
+      - Notifications
+schemes:
+- http
+swagger: "2.0"
