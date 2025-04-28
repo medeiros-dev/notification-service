@@ -68,7 +68,7 @@ The system is designed with observability (tracing, metrics, logging), configura
 
 ## Configuration
 
-Configuration for all services is managed **exclusively via environment variables** set within the `docker-compose.yml` file.
+Configuration for all services is managed primarily via environment variables set within the `docker-compose.yml` file. For sensitive information like email credentials, Docker secrets are used.
 
 Key environment variables configured in `docker-compose.yml` include:
 
@@ -84,10 +84,14 @@ Key environment variables configured in `docker-compose.yml` include:
 *   `OTEL_EXPORTER_OTLP_ENDPOINT`: OTLP exporter endpoint (e.g., `jaeger:4317` or `http://jaeger:4317`).
 *   `OTEL_EXPORTER_OTLP_INSECURE`: Set to `true` to disable TLS for OTLP export.
 *   `METRICS_SERVER_ADDRESS` (Consumer): Address for the Prometheus metrics HTTP server (e.g., `:8081`).
-*   **Email Specific (Consumer):** These **must** be configured in `docker-compose.yml` under the `notification-consumer` service for email notifications to function:
-    *   `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`, `EMAIL_ENCRYPTION`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`.
-    *   **Security Note:** Avoid committing real passwords directly. Consider using Docker secrets or environment variable injection methods for production.
 
+**Email Secrets (Consumer):** Email credentials for the `notification-consumer` service are managed via a Docker secret.
+
+*   The file `email_secrets.env` (located in the project root) contains the following key-value pairs:
+    *   `EMAIL_DRIVER`, `EMAIL_MAILER`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`, `EMAIL_ENCRYPTION`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`.
+*   This file is mounted as the `email_secrets` Docker secret.
+*   The `notification-consumer` service uses the `env_file` directive in `docker-compose.yml` to load these values from the mounted secret (`/run/secrets/email_secrets`) into its environment.
+*   **Modify the `email_secrets.env` file directly** if you need to change email settings.
 
 ## Running the Services
 
@@ -99,7 +103,9 @@ This project is designed to be run using Docker Compose, which orchestrates the 
 
 **Steps:**
 
-1.  **Configuration:** All necessary configuration is now handled via environment variables within the `docker-compose.yml` file. **You no longer need to create or manage separate `.env` files** in the service directories for Docker execution. Ensure the environment variables within `docker-compose.yml` (especially Kafka endpoints and **Consumer Email settings**) are correctly set for your environment.
+1.  **Configuration:**
+    *   Review and adjust non-sensitive environment variables directly within the `docker-compose.yml` file if needed (e.g., Kafka endpoints).
+    *   **Important:** Configure email credentials by editing the `email_secrets.env` file in the project root directory. **Do not commit sensitive credentials** if sharing the repository.
 
 2.  **Build and Run:** Navigate to the root directory of the project and run:
 
