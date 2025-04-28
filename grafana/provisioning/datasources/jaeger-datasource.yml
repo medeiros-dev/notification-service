@@ -1,0 +1,12 @@
+apiVersion: 1
+
+datasources:
+  - name: Jaeger
+    type: jaeger
+    uid: jaeger-ds
+    url: http://jaeger:16686
+    access: proxy
+    jsonData:
+      tracesToLogs:
+        serviceMap:
+          datasourceUid: 'prometheus-ds'

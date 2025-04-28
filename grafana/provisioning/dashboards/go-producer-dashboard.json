@@ -1,0 +1,146 @@
+{
+  "id": null,
+  "uid": "go-producer-dashboard",
+  "title": "Go Producer Metrics",
+  "tags": ["go-producer", "prometheus"],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 2,
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Messages Received (by Channel)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(go_producer_messages_received_total) by (channel_type)",
+          "legendFormat": "{{channel_type}}"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4}
+    },
+    {
+      "type": "stat",
+      "title": "Messages Sent Successfully (by Channel)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(go_producer_messages_sent_success_total) by (channel_type)",
+          "legendFormat": "{{channel_type}}"
+        }
+      ],
+      "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4}
+    },
+    {
+      "type": "stat",
+      "title": "Messages Sent Failed (by Channel)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(go_producer_messages_sent_failed_total) by (channel_type)",
+          "legendFormat": "{{channel_type}}"
+        }
+      ],
+      "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4}
+    },
+    {
+      "type": "stat",
+      "title": "HTTP Requests (Total)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(go_producer_http_requests_total)",
+          "legendFormat": "Total"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 4, "w": 6, "h": 4}
+    },
+    {
+      "type": "stat",
+      "title": "HTTP Errors (4xx/5xx)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(go_producer_http_requests_total{status=~\"Client Error|Server Error\"})",
+          "legendFormat": "Errors"
+        }
+      ],
+      "gridPos": {"x": 6, "y": 4, "w": 6, "h": 4}
+    },
+    {
+      "type": "graph",
+      "title": "HTTP Request Duration (seconds)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(go_producer_http_request_duration_seconds_bucket[1m])) by (le, endpoint))",
+          "legendFormat": "{{endpoint}} (p95)"
+        }
+      ],
+      "yaxes": [{"format": "s"}, {"format": "short"}],
+      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}
+    },
+    {
+      "type": "stat",
+      "title": "Kafka Publish Success",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(go_producer_kafka_publish_total{result=\"success\"})",
+          "legendFormat": "Success"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 16, "w": 6, "h": 4}
+    },
+    {
+      "type": "stat",
+      "title": "Kafka Publish Failure",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(go_producer_kafka_publish_total{result=\"failure\"})",
+          "legendFormat": "Failure"
+        }
+      ],
+      "gridPos": {"x": 6, "y": 16, "w": 6, "h": 4}
+    },
+    {
+      "type": "graph",
+      "title": "Kafka Publish Duration (seconds)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(go_producer_kafka_publish_duration_seconds_bucket[1m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "yaxes": [{"format": "s"}, {"format": "short"}],
+      "gridPos": {"x": 0, "y": 20, "w": 12, "h": 8}
+    },
+    {
+      "type": "stat",
+      "title": "Errors (Total)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(go_producer_error_total)",
+          "legendFormat": "Total"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 28, "w": 6, "h": 4}
+    },
+    {
+      "type": "table",
+      "title": "Errors by Type",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(go_producer_error_total) by (type)",
+          "legendFormat": "{{type}}"
+        }
+      ],
+      "gridPos": {"x": 6, "y": 28, "w": 6, "h": 4}
+    }
+  ]
+} 
